@@ -1,0 +1,75 @@
+name: Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (Git SHA)'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: ecs-fargate-cicd
+  
+  TOOLING_ACCOUNT_ID: "472294262990"
+  STAGING_ACCOUNT_ID: "956574163435"
+  
+  TOOLING_ROLE_ARN: "arn:aws:iam::472294262990:role/ecs-fargate-cicd-github-actions-role"
+  STAGING_ROLE_ARN: "arn:aws:iam::956574163435:role/staging-ci-deploy-role"
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging  # Requires manual approval in GitHub
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Image Tag
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            echo "Error: image_tag is required"
+            exit 1
+          fi
+          echo "Deploying image tag: ${{ inputs.image_tag }}"
+
+      - name: Configure AWS Credentials (Tooling)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.TOOLING_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-StagingDeploy
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        working-directory: infrastructure/environments/staging
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: infrastructure/environments/staging
+        run: |
+          terraform plan -out=staging.tfplan \
+            -var="image_tag=${{ inputs.image_tag }}"
+
+      - name: Terraform Apply
+        working-directory: infrastructure/environments/staging
+        run: terraform apply -auto-approve staging.tfplan
+
+      - name: Get ALB DNS Name
+        working-directory: infrastructure/environments/staging
+        run: |
+          ALB_DNS=$(terraform output -raw alb_dns_name 2>/dev/null || echo "Not yet available")
+          echo "## 🎯 Staging Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**ALB DNS:** http://$ALB_DNS" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY

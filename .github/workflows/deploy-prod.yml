@@ -1,0 +1,95 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (Git SHA)'
+        required: true
+        type: string
+      confirm_deployment:
+        description: 'Type "DEPLOY" to confirm production deployment'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: ecs-fargate-cicd
+  
+  TOOLING_ACCOUNT_ID: "472294262990"
+  PROD_ACCOUNT_ID: "235249476696"
+  
+  TOOLING_ROLE_ARN: "arn:aws:iam::472294262990:role/ecs-fargate-cicd-github-actions-role"
+  PROD_ROLE_ARN: "arn:aws:iam::235249476696:role/prod-ci-deploy-role"
+
+jobs:
+  validate:
+    name: Validate Deployment Request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm Deployment
+        run: |
+          if [ "${{ inputs.confirm_deployment }}" != "DEPLOY" ]; then
+            echo "❌ Deployment not confirmed. Please type 'DEPLOY' to proceed."
+            exit 1
+          fi
+          echo "✅ Deployment confirmed for image: ${{ inputs.image_tag }}"
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production  # Requires manual approval in GitHub
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Image Tag
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            echo "Error: image_tag is required"
+            exit 1
+          fi
+          echo "🚨 PRODUCTION DEPLOYMENT 🚨"
+          echo "Deploying image tag: ${{ inputs.image_tag }}"
+
+      - name: Configure AWS Credentials (Tooling)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.TOOLING_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-ProdDeploy
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        working-directory: infrastructure/environments/prod
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: infrastructure/environments/prod
+        run: |
+          terraform plan -out=prod.tfplan \
+            -var="image_tag=${{ inputs.image_tag }}"
+
+      - name: Terraform Apply
+        working-directory: infrastructure/environments/prod
+        run: terraform apply -auto-approve prod.tfplan
+
+      - name: Get ALB DNS Name
+        working-directory: infrastructure/environments/prod
+        run: |
+          ALB_DNS=$(terraform output -raw alb_dns_name 2>/dev/null || echo "Not yet available")
+          echo "## 🏆 Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**ALB DNS:** http://$ALB_DNS" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** ${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Remember to verify production health!**" >> $GITHUB_STEP_SUMMARY

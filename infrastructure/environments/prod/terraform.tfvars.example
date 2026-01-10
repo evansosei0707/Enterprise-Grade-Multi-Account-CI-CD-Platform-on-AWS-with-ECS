@@ -1,0 +1,42 @@
+#------------------------------------------------------------------------------
+# Prod Environment - Terraform Variables Example
+#------------------------------------------------------------------------------
+
+aws_region   = "us-east-1"
+project_name = "ecs-fargate-cicd"
+environment  = "prod"
+
+tooling_account_id = "472294262990"
+prod_account_id    = "235249476696"
+
+deploy_role_arn = "arn:aws:iam::235249476696:role/prod-ci-deploy-role"
+
+# Network Configuration (from Day-0 StackSet)
+vpc_id = "vpc-xxxxxxxxx"
+public_subnet_ids = [
+  "subnet-xxxxxxxxx",
+  "subnet-yyyyyyyyy",
+  "subnet-zzzzzzzzz"
+]
+private_subnet_ids = [
+  "subnet-aaaaaaaaaa",
+  "subnet-bbbbbbbbbb",
+  "subnet-cccccccccc"
+]
+alb_security_group_id = "sg-xxxxxxxxx"
+
+# ECR Configuration
+ecr_repository_url = "472294262990.dkr.ecr.us-east-1.amazonaws.com/ecs-fargate-cicd-inventory-api"
+image_tag          = "latest"
+
+# ECS Configuration (Prod-optimized)
+container_port = 8080
+task_cpu       = 512
+task_memory    = 1024
+desired_count  = 2
+
+# Prod Settings
+log_retention_days = 30
+enable_autoscaling = true
+min_capacity       = 2
+max_capacity       = 6
