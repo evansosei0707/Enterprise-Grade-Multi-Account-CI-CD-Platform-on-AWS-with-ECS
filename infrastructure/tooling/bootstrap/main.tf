@@ -81,9 +81,14 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
+        # Branch-based triggers
         "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main",
         "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/*",
-        "repo:${var.github_org}/${var.github_repo}:pull_request"
+        "repo:${var.github_org}/${var.github_repo}:pull_request",
+        # Environment-based triggers (when using GitHub environments)
+        "repo:${var.github_org}/${var.github_repo}:environment:dev",
+        "repo:${var.github_org}/${var.github_repo}:environment:staging",
+        "repo:${var.github_org}/${var.github_repo}:environment:prod"
       ]
     }
   }

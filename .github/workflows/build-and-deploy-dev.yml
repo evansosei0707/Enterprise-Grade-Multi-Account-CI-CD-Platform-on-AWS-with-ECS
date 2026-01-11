@@ -98,7 +98,11 @@ jobs:
         working-directory: infrastructure/environments/dev
         run: |
           terraform plan -out=dev.tfplan \
-            -var="image_tag=${{ needs.build.outputs.image_tag }}"
+            -var="image_tag=${{ needs.build.outputs.image_tag }}" \
+            -var="vpc_id=${{ vars.DEV_VPC_ID }}" \
+            -var="public_subnet_ids=[\"${{ vars.DEV_PUBLIC_SUBNET_1 }}\",\"${{ vars.DEV_PUBLIC_SUBNET_2 }}\"]" \
+            -var="private_subnet_ids=[\"${{ vars.DEV_PRIVATE_SUBNET_1 }}\",\"${{ vars.DEV_PRIVATE_SUBNET_2 }}\"]" \
+            -var="alb_security_group_id=${{ vars.DEV_ALB_SG_ID }}"
 
       - name: Terraform Apply
         working-directory: infrastructure/environments/dev
