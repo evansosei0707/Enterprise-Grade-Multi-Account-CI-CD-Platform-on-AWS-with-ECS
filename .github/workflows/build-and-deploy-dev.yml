@@ -59,13 +59,11 @@ jobs:
         run: |
           cd app/inventory-api
           
-          # Build the Docker image
+          # Build and tag the Docker image with Git SHA
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           
-          # Push both tags
+          # Push the image
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           
           echo "Pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
